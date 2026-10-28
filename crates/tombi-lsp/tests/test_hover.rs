@@ -1994,6 +1994,159 @@ mod hover_keys_value {
         );
     }
 
+    mod pixi_extension {
+        use tombi_test_lib::PixiTestChannel;
+
+        use super::*;
+
+        fn pixi_toml_path(fixture: &str) -> PathBuf {
+            tombi_test_lib::project_root_path()
+                .join("crates/tombi-lsp/tests/fixtures/extensions")
+                .join(fixture)
+                .join("pixi.toml")
+        }
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_version_hover_appends_latest_version(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = ">=█1.0"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "dependencies.tombi-pixi-test",
+                "Value": "String",
+                "Description": Some("Latest Version: `2.0.0`"),
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_key_hover_appends_latest_version(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [feature.test.target.linux-64.dependencies]
+                tombi-pixi█-test = { version = ">=1.0", build = "*" }
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "feature.test.target.linux-64.dependencies.tombi-pixi-test",
+                "Value": "Table",
+                "Description": Some("Latest Version: `2.0.0`"),
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_table_version_hover_appends_latest_version(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = [{ channel = "{{CHANNEL}}", priority = 1 }]
+                platforms = ["linux-64"]
+
+                [host-dependencies]
+                tombi-pixi-test = { version = "█>=1.0" }
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "host-dependencies.tombi-pixi-test.version",
+                "Value": "String",
+                "Description": Some("Latest Version: `2.0.0`"),
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_hover_ignores_channels_without_shards(
+                &PixiTestChannel::without_shards().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = ">=█1.0"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "dependencies.tombi-pixi-test",
+                "Value": "String",
+                "Description": None::<&str>,
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_pypi_dependency_hover_is_ignored(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [pypi-dependencies]
+                tombi-pixi-test = ">=█1.0"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "pypi-dependencies.tombi-pixi-test",
+                "Value": "String",
+                "Description": None::<&str>,
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_hover_disabled_by_extension_config(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = ">=█1.0"
+                "#),
+                SourcePath(pixi_toml_path("pixi-disabled")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "dependencies.tombi-pixi-test",
+                "Value": "String",
+                "Description": None::<&str>,
+            });
+        );
+
+        test_hover_keys_value!(
+            #[tokio::test]
+            async fn pixi_dependency_hover_disabled_by_hover_config(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = ">=█1.0"
+                "#),
+                SourcePath(pixi_toml_path("pixi-hover-disabled")),
+                UseTestCacheHome,
+            ) -> Ok({
+                "Keys": "dependencies.tombi-pixi-test",
+                "Value": "String",
+                "Description": None::<&str>,
+            });
+        );
+    }
+
     mod non_schema {
         use super::*;
 

@@ -614,6 +614,97 @@ mod completion_edit {
         }
     }
 
+    mod pixi_extension {
+        use tombi_test_lib::PixiTestChannel;
+
+        use super::*;
+
+        fn pixi_toml_path() -> std::path::PathBuf {
+            project_root_path()
+                .join("crates/tombi-lsp/tests/fixtures/extensions/pixi-default/pixi.toml")
+        }
+
+        test_completion_edit! {
+            #[tokio::test]
+            async fn pixi_dependency_version_string(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = "█"
+                "#),
+                Select("\"1.10.0\""),
+                SourcePath(pixi_toml_path()),
+                UseTestCacheHome,
+            ) -> Ok(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = "1.10.0"
+                "#)
+            );
+        }
+
+        test_completion_edit! {
+            #[tokio::test]
+            async fn pixi_dependency_table_version_string(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = { version = "█" }
+                "#),
+                Select("\"2.0.0\""),
+                SourcePath(pixi_toml_path()),
+                UseTestCacheHome,
+            ) -> Ok(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = { version = "2.0.0" }
+                "#)
+            );
+        }
+
+        test_completion_edit! {
+            #[tokio::test]
+            async fn pixi_dependency_version_after_equal(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test= █
+                python = "*"
+                "#),
+                Select("\"2.0.0\""),
+                SourcePath(pixi_toml_path()),
+                UseTestCacheHome,
+            ) -> Ok(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test  = "2.0.0"
+                python = "*"
+                "#)
+            );
+        }
+    }
+
     mod pyproject_schema {
         use tombi_test_lib::pyproject_schema_path;
 
@@ -1278,6 +1369,7 @@ mod completion_edit {
                     select: Option<String>,
                     source_file_path: Option<std::path::PathBuf>,
                     schema_file_path: Option<std::path::PathBuf>,
+                    use_test_cache_home: bool,
                     backend_options: tombi_lsp::backend::Options,
                 }
 
@@ -1313,6 +1405,15 @@ mod completion_edit {
                     }
                 }
 
+                #[allow(unused)]
+                struct UseTestCacheHome;
+
+                impl ApplyTestArg for UseTestCacheHome {
+                    fn apply(self, args: &mut TestArgs) {
+                        args.use_test_cache_home = true;
+                    }
+                }
+
                 impl ApplyTestArg for tombi_lsp::backend::Options {
                     fn apply(self, args: &mut TestArgs) {
                         args.backend_options = self;
@@ -1322,6 +1423,10 @@ mod completion_edit {
                 #[allow(unused_mut)]
                 let mut args = TestArgs::default();
                 $(ApplyTestArg::apply($arg, &mut args);)*
+
+                let _cache_home = args
+                    .use_test_cache_home
+                    .then(tombi_test_lib::TestCacheHome::new);
 
                 let (service, _) = LspService::new(|client| {
                     Backend::new(client, &args.backend_options)

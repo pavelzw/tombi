@@ -143,6 +143,14 @@ pub async fn handle_hover(
             .map(|feature_dependencies| feature_dependencies.enabled())
             .unwrap_or_default()
             .value();
+        let pixi_dependency_detail_hover_enabled = config
+            .pixi_extension_features()
+            .and_then(|features| features.lsp())
+            .and_then(|lsp| lsp.hover())
+            .and_then(|hover| hover.dependency_detail())
+            .map(|dependency_detail| dependency_detail.enabled())
+            .unwrap_or_default()
+            .value();
         let pyproject_dependency_detail_hover_enabled = config
             .pyproject_extension_features()
             .and_then(|features| features.lsp())
@@ -192,6 +200,22 @@ pub async fn handle_hover(
             some @ Some(_) => some,
             None if pyproject_dependency_detail_hover_enabled => {
                 tombi_extension_pyproject::hover(
+                    &text_document_uri,
+                    document_tree,
+                    &accessors,
+                    offset,
+                    toml_version,
+                    offline,
+                    cache_options,
+                )
+                .await?
+            }
+            None => None,
+        };
+        let extension_hover = match extension_hover {
+            some @ Some(_) => some,
+            None if pixi_dependency_detail_hover_enabled => {
+                tombi_extension_pixi::hover(
                     &text_document_uri,
                     document_tree,
                     &accessors,
