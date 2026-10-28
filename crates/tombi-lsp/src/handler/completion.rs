@@ -212,6 +212,22 @@ pub async fn handle_completion(
     {
         completion_items.extend(items);
     }
+    if config.pixi_extension_enabled()
+        && let Some(items) = tombi_extension_pixi::completion(
+            &text_document_uri,
+            document_tree,
+            offset,
+            &accessors,
+            completion_hint,
+            comment_context.is_some(),
+            offline,
+            cache_options,
+            config.pixi_extension_features(),
+        )
+        .await?
+    {
+        completion_items.extend(items);
+    }
     if config.pyproject_extension_enabled()
         && let Some(items) = tombi_extension_pyproject::completion(
             &text_document_uri,

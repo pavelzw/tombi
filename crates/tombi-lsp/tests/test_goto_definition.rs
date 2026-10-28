@@ -512,6 +512,7 @@ mod goto_definition_tests {
             ) -> Ok([
                 project_root_path().join("extensions/tombi-extension-cargo/Cargo.toml"),
                 project_root_path().join("extensions/tombi-extension-nagi-sql/Cargo.toml"),
+                project_root_path().join("extensions/tombi-extension-pixi/Cargo.toml"),
                 project_root_path().join("extensions/tombi-extension-pyproject/Cargo.toml"),
                 project_root_path().join("extensions/tombi-extension-tombi/Cargo.toml"),
             ]);

@@ -309,6 +309,7 @@ mod completion_labels {
                 SchemaPath(tombi_schema_path()),
             ) -> Ok([
                 "tombi-toml/cargo",
+                "tombi-toml/pixi",
                 "tombi-toml/pyproject",
                 "tombi-toml/tombi",
             ]);
@@ -2379,6 +2380,119 @@ mod completion_labels {
                     "crates/tombi-lsp/tests/fixtures/nagi-completion/my-nagi.toml"
                 )),
             ) -> Ok([]);
+        }
+    }
+
+    mod pixi_extension {
+        use tombi_test_lib::PixiTestChannel;
+
+        use super::*;
+
+        fn pixi_toml_path(fixture: &str) -> std::path::PathBuf {
+            project_root_path()
+                .join("crates/tombi-lsp/tests/fixtures/extensions")
+                .join(fixture)
+                .join("pixi.toml")
+        }
+
+        test_completion_labels! {
+            #[tokio::test]
+            async fn pixi_dependency_versions_are_sorted_descending(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = "█"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+                PreselectedLabels(&["\"2.0.0\""]),
+            ) -> Ok([
+                "\"2.0.0\"",
+                "\"1.10.0\"",
+                "\"1.2.0\"",
+                "\"1.0.0\"",
+                "\"0.9.0\"",
+            ]);
+        }
+
+        test_completion_labels! {
+            #[tokio::test]
+            async fn pixi_dependency_table_version_completion(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [feature.test.dependencies]
+                tombi-pixi-test = { version = "█" }
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok([
+                "\"2.0.0\"",
+                "\"1.10.0\"",
+                "\"1.2.0\"",
+                "\"1.0.0\"",
+                "\"0.9.0\"",
+            ]);
+        }
+
+        test_completion_labels! {
+            #[tokio::test]
+            async fn pixi_target_dependency_completion_uses_target_platform(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64", "osx-arm64"]
+
+                [target.osx-arm64.dependencies]
+                tombi-pixi-test = "█"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok([
+                "\"2.0.0\"",
+                "\"1.10.0\"",
+                "\"1.2.0\"",
+                "\"1.0.0\"",
+            ]);
+        }
+
+        test_completion_labels! {
+            #[tokio::test]
+            async fn pixi_dependency_completion_ignores_channels_without_shards(
+                &PixiTestChannel::without_shards().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = "█"
+                "#),
+                SourcePath(pixi_toml_path("pixi-default")),
+                UseTestCacheHome,
+            ) -> Ok([
+            ]);
+        }
+
+        test_completion_labels! {
+            #[tokio::test]
+            async fn pixi_dependency_version_completion_disabled_by_config(
+                &PixiTestChannel::sharded().pixi_toml(r#"
+                [workspace]
+                channels = ["{{CHANNEL}}"]
+                platforms = ["linux-64"]
+
+                [dependencies]
+                tombi-pixi-test = "█"
+                "#),
+                SourcePath(pixi_toml_path("pixi-completion-disabled")),
+                UseTestCacheHome,
+            ) -> Ok([
+            ]);
         }
     }
 
@@ -4489,6 +4603,7 @@ mod completion_labels {
                     subschemas: Vec<SubSchema>,
                     cached_responses: Vec<CachedResponse>,
                     preselected_labels: Option<Vec<String>>,
+                    use_test_cache_home: bool,
                     backend_options: tombi_lsp::backend::Options,
                 }
 
@@ -4565,6 +4680,15 @@ mod completion_labels {
                     }
                 }
 
+                #[allow(unused)]
+                struct UseTestCacheHome;
+
+                impl ApplyTestArg for UseTestCacheHome {
+                    fn apply(self, args: &mut TestArgs) {
+                        args.use_test_cache_home = true;
+                    }
+                }
+
                 impl ApplyTestArg for tombi_lsp::backend::Options {
                     fn apply(self, args: &mut TestArgs) {
                         args.backend_options = self;
@@ -4575,7 +4699,7 @@ mod completion_labels {
                 let mut args = TestArgs::default();
                 $(ApplyTestArg::apply($arg, &mut args);)*
 
-                let _cache_home = if args.cached_responses.is_empty() {
+                let _cache_home = if args.cached_responses.is_empty() && !args.use_test_cache_home {
                     None
                 } else {
                     Some(TestCacheHome::new())
